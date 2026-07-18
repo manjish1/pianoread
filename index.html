@@ -542,7 +542,7 @@ function freezeTimer() {
   stopTimer();
   if (!timerEnabled) return;
   var elapsed = Date.now() - questionStartTime;
-  var secs = Math.min(elapsed, MAX_TIME) / 1000;
+  var secs = elapsed / 1000;
   // Keep bar frozen at current position, just update label to show answer time
   var timeEl = document.getElementById('timer-time');
   timeEl.textContent = 'Answered in ' + secs.toFixed(1) + 's';
