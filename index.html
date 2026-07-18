@@ -99,6 +99,15 @@ nav button.on{background:var(--s2);border-color:var(--b);color:var(--txt)}
 .q-badge.wrong{background:rgba(248,113,113,.15);color:var(--red)}
 .q-badge.skipped{background:rgba(251,191,36,.15);color:var(--yel)}
 
+/* Timer */
+.timer-wrap{display:none;flex-direction:column;gap:4px}
+.timer-track{height:6px;background:var(--b);border-radius:6px;overflow:hidden}
+.timer-fill{height:100%;width:100%;border-radius:6px;transition:background .4s}
+.timer-meta{display:flex;justify-content:space-between;align-items:center}
+.timer-time{font-size:12px;font-weight:700;color:var(--dim);font-variant-numeric:tabular-nums}
+.timer-toggle{background:none;border:1px solid var(--b);border-radius:16px;padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--ff);color:var(--dim);transition:color .2s,border-color .2s}
+.timer-toggle.on{color:var(--acc);border-color:var(--acc)}
+
 /* Confetti canvas */
 #confetti-canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:900}
 
@@ -168,7 +177,19 @@ nav button.on{background:var(--s2);border-color:var(--b);color:var(--txt)}
       <div class="stat w"><div class="n" id="sw">0</div><div class="l">Wrong</div></div>
       <div class="stat s"><div class="n" id="ss">0</div><div class="l">Skipped</div></div>
     </div>
-    <button class="reset-btn" onclick="resetToday()">↺ Reset today's score</button>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <button class="reset-btn" onclick="resetToday()">↺ Reset today's score</button>
+      <button class="timer-toggle" id="timer-toggle" onclick="toggleTimer()">⏱ Timer: OFF</button>
+    </div>
+  </div>
+
+  <!-- Timer bar -->
+  <div class="timer-wrap" id="timer-wrap">
+    <div class="timer-meta">
+      <span style="font-size:11px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.4px">Time</span>
+      <span class="timer-time" id="timer-time">15.0s</span>
+    </div>
+    <div class="timer-track"><div class="timer-fill" id="timer-fill"></div></div>
   </div>
 
   <div class="staff-card" id="staff-card">
@@ -483,6 +504,67 @@ function resetToday() {
   refreshStats(); updateScoreUI();
 }
 
+// ─── Timer ────────────────────────────────────────────────────────────────────
+var timerEnabled = false;
+var questionStartTime = 0;
+var timerRAF = null;
+var MAX_TIME = 15000, FULL_TIME = 5000, MIN_FACTOR = 0.2;
+
+function loadTimerSetting() {
+  try { timerEnabled = !!JSON.parse(localStorage.getItem('pianoread_timer')); } catch(e) {}
+  applyTimerToggleUI();
+}
+
+function toggleTimer() {
+  timerEnabled = !timerEnabled;
+  try { localStorage.setItem('pianoread_timer', JSON.stringify(timerEnabled)); } catch(e) {}
+  applyTimerToggleUI();
+}
+
+function applyTimerToggleUI() {
+  var btn = document.getElementById('timer-toggle');
+  var wrap = document.getElementById('timer-wrap');
+  btn.textContent = timerEnabled ? '⏱ Timer: ON' : '⏱ Timer: OFF';
+  btn.className = timerEnabled ? 'timer-toggle on' : 'timer-toggle';
+  wrap.style.display = timerEnabled ? 'flex' : 'none';
+}
+
+function startTimer() {
+  stopTimer();
+  if (!timerEnabled) return;
+  questionStartTime = Date.now();
+  tickTimer();
+}
+
+function stopTimer() {
+  if (timerRAF) { cancelAnimationFrame(timerRAF); timerRAF = null; }
+}
+
+function tickTimer() {
+  var elapsed = Date.now() - questionStartTime;
+  var pct = Math.max(0, 1 - elapsed / MAX_TIME);
+  var fill = document.getElementById('timer-fill');
+  var timeEl = document.getElementById('timer-time');
+  fill.style.width = (pct * 100) + '%';
+  // Green → yellow → red
+  var r, g;
+  if (pct > 0.5) { r = Math.round(255 * (1 - pct) * 2); g = 210; }
+  else           { r = 248; g = Math.round(210 * pct * 2); }
+  fill.style.background = 'rgb('+r+','+g+',70)';
+  var secs = Math.max(0, MAX_TIME - elapsed) / 1000;
+  timeEl.textContent = secs.toFixed(1) + 's';
+  timeEl.style.color = pct < 0.33 ? 'var(--red)' : pct < 0.67 ? 'var(--yel)' : 'var(--dim)';
+  if (elapsed < MAX_TIME) timerRAF = requestAnimationFrame(tickTimer);
+}
+
+function getTimeFactor() {
+  if (!timerEnabled) return 1;
+  var elapsed = Date.now() - questionStartTime;
+  if (elapsed <= FULL_TIME) return 1;
+  if (elapsed >= MAX_TIME) return MIN_FACTOR;
+  return 1 - (elapsed - FULL_TIME) / (MAX_TIME - FULL_TIME) * (1 - MIN_FACTOR);
+}
+
 // ─── Award points ─────────────────────────────────────────────────────────────
 // type: 'correct' | 'partial' | 'wrong' | 'skipped'
 // basePts: raw points before multiplier (e.g. +20 full chord, +5 partial, -10 all wrong)
@@ -491,7 +573,7 @@ function awardPoints(type, basePts) {
   var m = 1;
   if (type === 'correct') {
     m = getMult();
-    pts = Math.round(basePts * m);
+    pts = Math.round(basePts * m * getTimeFactor());
     streak++;
     var g = loadGame();
     var oldIdx = getLevelIdx(g.xp);
@@ -501,9 +583,9 @@ function awardPoints(type, basePts) {
     if (newIdx > oldIdx) setTimeout(function(){ showLevelUp(LEVELS[newIdx]); }, 600);
     updateLevelUI();
   } else if (type === 'partial') {
-    // No multiplier, no streak, but XP for the positive portion
+    pts = Math.round(basePts * getTimeFactor());
     streak = 0;
-    var xpGain = Math.max(0, basePts);
+    var xpGain = Math.max(0, pts);
     if (xpGain > 0) {
       var g2 = loadGame();
       g2.xp += xpGain;
@@ -650,6 +732,7 @@ function submit() {
 }
 
 function goAwaitNext() {
+  stopTimer();
   awaitingNext=true;
   var btn=document.getElementById('chk');
   btn.textContent='Next →'; btn.disabled=false;
@@ -669,7 +752,7 @@ function nextQ(){
   var fb=document.getElementById('fb'); fb.style.display='none'; fb.className='fb';
   var btn=document.getElementById('chk'); btn.textContent='Check'; btn.disabled=false;
   document.getElementById('hint-txt').style.visibility='visible';
-  Q=genQ(); drawStaff(Q); buildFields(Q);
+  Q=genQ(); drawStaff(Q); buildFields(Q); startTimer();
   var tag=document.getElementById('ctag');
   tag.textContent=(Q.clef==='bass')?'Bass clef — left hand':'Treble clef — right hand';
   tag.className='clef-tag '+Q.clef;
@@ -752,6 +835,7 @@ function showView(v){
 refreshStats();
 updateLevelUI();
 updateScoreUI();
+loadTimerSetting();
 nextQ();
 </script>
 </body>
