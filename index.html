@@ -24,7 +24,7 @@ nav{display:flex;gap:3px;flex-shrink:0}
 nav button{background:none;border:1px solid transparent;color:var(--dim);padding:5px 11px;border-radius:18px;font-size:12px;cursor:pointer;font-family:var(--ff)}
 nav button.on{background:var(--s2);border-color:var(--b);color:var(--txt)}
 
-#quiz{flex:1;height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;padding:12px 14px 24px;gap:10px}
+#quiz{flex:1;height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;padding:12px 14px 8px;gap:8px}
 
 /* Score row */
 .score-row{display:flex;align-items:center;gap:8px;background:var(--s1);border:1px solid var(--b);border-radius:12px;padding:10px 14px}
@@ -64,7 +64,7 @@ nav button.on{background:var(--s2);border-color:var(--b);color:var(--txt)}
 
 /* Inputs */
 .inputs{display:flex;flex-direction:column;gap:10px}
-.fields{display:flex;gap:10px;justify-content:center;min-height:80px;align-items:center}
+.fields{display:flex;gap:10px;justify-content:center;align-items:center}
 .fw{display:flex;flex-direction:column;align-items:center;gap:4px}
 .fl{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
 .ni{width:68px;height:68px;background:var(--s2);border:2px solid var(--b);border-radius:12px;color:var(--txt);font-size:28px;font-weight:700;text-align:center;outline:none;text-transform:uppercase;font-family:var(--ff)}
@@ -183,15 +183,6 @@ nav button.on{background:var(--s2);border-color:var(--b);color:var(--txt)}
     </div>
   </div>
 
-  <!-- Timer bar -->
-  <div class="timer-wrap" id="timer-wrap">
-    <div class="timer-meta">
-      <span style="font-size:11px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.4px">Time</span>
-      <span class="timer-time" id="timer-time">15.0s</span>
-    </div>
-    <div class="timer-track"><div class="timer-fill" id="timer-fill"></div></div>
-  </div>
-
   <div class="staff-card" id="staff-card">
     <div id="staff-render"></div>
     <div class="clef-tag" id="ctag"></div>
@@ -199,6 +190,13 @@ nav button.on{background:var(--s2);border-color:var(--b);color:var(--txt)}
   <div class="fb" id="fb"></div>
   <div class="inputs">
     <div class="fields" id="fields"></div>
+    <div class="timer-wrap" id="timer-wrap">
+      <div class="timer-meta">
+        <span style="font-size:11px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.4px">Time</span>
+        <span class="timer-time" id="timer-time">15.0s</span>
+      </div>
+      <div class="timer-track"><div class="timer-fill" id="timer-fill"></div></div>
+    </div>
     <button class="chk" id="chk" onclick="handleBtn()">Check</button>
     <div class="hint" id="hint-txt">Type <strong>?</strong> in any field to reveal the answer</div>
   </div>
