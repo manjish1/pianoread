@@ -484,31 +484,37 @@ function resetToday() {
 }
 
 // ─── Award points ─────────────────────────────────────────────────────────────
-function awardPoints(outcome) {
-  var pts = 0;
+// type: 'correct' | 'partial' | 'wrong' | 'skipped'
+// basePts: raw points before multiplier (e.g. +20 full chord, +5 partial, -10 all wrong)
+function awardPoints(type, basePts) {
+  var pts = basePts;
   var m = 1;
-  if (outcome === 'correct') {
+  if (type === 'correct') {
     m = getMult();
-    pts = Math.round(10 * m);
+    pts = Math.round(basePts * m);
     streak++;
-    // XP gained (never lost)
     var g = loadGame();
     var oldIdx = getLevelIdx(g.xp);
     g.xp += pts;
     saveGame(g);
     var newIdx = getLevelIdx(g.xp);
-    if (newIdx > oldIdx) {
-      setTimeout(function(){ showLevelUp(LEVELS[newIdx]); }, 600);
-    }
+    if (newIdx > oldIdx) setTimeout(function(){ showLevelUp(LEVELS[newIdx]); }, 600);
     updateLevelUI();
-  } else if (outcome === 'wrong') {
-    pts = -5;
+  } else if (type === 'partial') {
+    // No multiplier, no streak, but XP for the positive portion
     streak = 0;
+    var xpGain = Math.max(0, basePts);
+    if (xpGain > 0) {
+      var g2 = loadGame();
+      g2.xp += xpGain;
+      saveGame(g2);
+      updateLevelUI();
+    }
   } else {
     streak = 0;
   }
   sessionScore += pts;
-  showPtPopup(pts, pts > 0 ? m : 1);
+  showPtPopup(pts, type === 'correct' ? m : 1);
   bumpScore();
   updateScoreUI();
 }
@@ -583,29 +589,61 @@ function submit() {
     if(vals[i]==='?'){
       showFb('skip','Answer: '+Q.letters.join(', '));
       record(Q,'?','skipped');
-      awardPoints('skipped');
+      awardPoints('skipped', 0);
       goAwaitNext(); return;
     }
   }
   for(i=0;i<vals.length;i++){if(!vals[i]){inputs[i].focus();return;}}
 
-  var correct=(vals.slice().sort().join('')===Q.letters.slice().sort().join(''));
-  for(i=0;i<inputs.length;i++) inputs[i].classList.add(correct?'ok':'bad');
+  if (Q.isChord) {
+    // Score each note individually: +10 per correct, -5 per wrong
+    var correctSet = Q.letters.slice();
+    var numRight = 0, numWrong = 0;
+    for(i=0;i<vals.length;i++){
+      if(correctSet.indexOf(vals[i])!==-1){ numRight++; inputs[i].classList.add('ok'); }
+      else { numWrong++; inputs[i].classList.add('bad'); }
+    }
+    var basePts = numRight * 10 - numWrong * 5;
+    record(Q, vals.join(','), numRight===vals.length ? 'correct' : 'wrong');
 
-  if(correct){
-    showFb('ok','✓ Correct!');
-    record(Q,vals.join(','),'correct');
-    awardPoints('correct');
-    flashCard('flash-ok');
-    launchConfetti();
+    if(numRight===vals.length){
+      showFb('ok','✓ Perfect! Both notes correct!');
+      awardPoints('correct', basePts); // basePts = +20
+      flashCard('flash-ok');
+      launchConfetti();
+    } else if(numRight > 0){
+      showFb('skip','~ Partial — answer: '+Q.letters.join(', '));
+      awardPoints('partial', basePts); // basePts = +5
+      flashCard('flash-bad');
+      for(i=0;i<inputs.length;i++){
+        if(inputs[i].classList.contains('bad')){
+          (function(el){el.classList.add('shake');setTimeout(function(){el.classList.remove('shake');},400);})(inputs[i]);
+        }
+      }
+    } else {
+      showFb('bad','✗ Wrong — answer: '+Q.letters.join(', '));
+      awardPoints('wrong', basePts); // basePts = -10
+      flashCard('flash-bad');
+      for(i=0;i<inputs.length;i++){
+        (function(el){el.classList.add('shake');setTimeout(function(){el.classList.remove('shake');},400);})(inputs[i]);
+      }
+    }
   } else {
-    showFb('bad','✗ Wrong — answer: '+Q.letters.join(', '));
-    record(Q,vals.join(','),'wrong');
-    awardPoints('wrong');
-    flashCard('flash-bad');
-    // Shake the inputs
-    for(i=0;i<inputs.length;i++){
-      (function(el){ el.classList.add('shake'); setTimeout(function(){el.classList.remove('shake');},400); })(inputs[i]);
+    // Single note
+    var correct = vals[0]===Q.letters[0];
+    inputs[0].classList.add(correct?'ok':'bad');
+    if(correct){
+      showFb('ok','✓ Correct!');
+      record(Q,vals[0],'correct');
+      awardPoints('correct', 10);
+      flashCard('flash-ok');
+      launchConfetti();
+    } else {
+      showFb('bad','✗ Wrong — answer: '+Q.letters[0]);
+      record(Q,vals[0],'wrong');
+      awardPoints('wrong', -5);
+      flashCard('flash-bad');
+      (function(el){el.classList.add('shake');setTimeout(function(){el.classList.remove('shake');},400);})(inputs[0]);
     }
   }
   goAwaitNext();
