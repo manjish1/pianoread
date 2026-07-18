@@ -748,7 +748,10 @@ function goAwaitNext() {
   var inputs=document.querySelectorAll('.ni');
   for(var i=0;i<inputs.length;i++) inputs[i].disabled=true;
   document.getElementById('hint-txt').style.visibility='hidden';
-  btn.focus();
+  btn.blur();
+  setTimeout(function(){
+    btn.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }, 150);
 }
 
 function showFb(type,msg){
