@@ -540,6 +540,17 @@ function stopTimer() {
   if (timerRAF) { cancelAnimationFrame(timerRAF); timerRAF = null; }
 }
 
+function freezeTimer() {
+  stopTimer();
+  if (!timerEnabled) return;
+  var elapsed = Date.now() - questionStartTime;
+  var secs = Math.min(elapsed, MAX_TIME) / 1000;
+  // Keep bar frozen at current position, just update label to show answer time
+  var timeEl = document.getElementById('timer-time');
+  timeEl.textContent = 'Answered in ' + secs.toFixed(1) + 's';
+  timeEl.style.color = elapsed <= FULL_TIME ? 'var(--grn)' : elapsed >= MAX_TIME ? 'var(--red)' : 'var(--yel)';
+}
+
 function tickTimer() {
   var elapsed = Date.now() - questionStartTime;
   var pct = Math.max(0, 1 - elapsed / MAX_TIME);
@@ -732,7 +743,7 @@ function submit() {
 }
 
 function goAwaitNext() {
-  stopTimer();
+  freezeTimer();
   awaitingNext=true;
   var btn=document.getElementById('chk');
   btn.textContent='Next →'; btn.disabled=false;
