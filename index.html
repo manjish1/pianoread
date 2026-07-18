@@ -753,6 +753,7 @@ function nextQ(){
   var btn=document.getElementById('chk'); btn.textContent='Check'; btn.disabled=false;
   document.getElementById('hint-txt').style.visibility='visible';
   Q=genQ(); drawStaff(Q); buildFields(Q); startTimer();
+  var qEl=document.getElementById('quiz'); qEl.scrollTop=0;
   var tag=document.getElementById('ctag');
   tag.textContent=(Q.clef==='bass')?'Bass clef — left hand':'Treble clef — right hand';
   tag.className='clef-tag '+Q.clef;
