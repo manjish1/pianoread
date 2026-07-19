@@ -592,7 +592,7 @@ function resetToday() {
 
 // ─── Timer ────────────────────────────────────────────────────────────────────
 var timerEnabled = false;
-var questionStartTime = 0;
+var questionStartTime = Date.now();
 var timerRAF = null;
 var MAX_TIME = 15000, FULL_TIME = 5000, MIN_FACTOR = 0.2;
 function qFull(){ return (Q&&Q.timerFull)||FULL_TIME; }
@@ -607,6 +607,13 @@ function toggleTimer() {
   timerEnabled = !timerEnabled;
   try { localStorage.setItem('pianoread_timer', JSON.stringify(timerEnabled)); } catch(e) {}
   applyTimerToggleUI();
+  if (timerEnabled && Q && !awaitingNext) {
+    startTimer(); // reset clock from now when toggled on mid-question
+  } else if (!timerEnabled) {
+    stopTimer();
+    var wrap = document.getElementById('timer-wrap');
+    wrap.style.display = 'none';
+  }
 }
 
 function applyTimerToggleUI() {
