@@ -468,9 +468,80 @@ function buildSVG(q, opts) {
   return '<svg width="'+W+'" height="'+H+'" xmlns="http://www.w3.org/2000/svg">'+out+'</svg>';
 }
 
+// ─── Grand staff SVG (two staves for mixed-hand questions) ───────────────────
+function buildGrandSVG(q, opts) {
+  var W=opts.W, LG=opts.lg||9;
+  var HALF=LG/2;
+  var topPad=Math.round(LG*1.2);
+  var staffGap=Math.round(LG*2);
+  var H=opts.H||(topPad+4*LG+staffGap+4*LG+Math.round(LG*2));
+  var TY1=topPad;                        // treble top line
+  var MY1=TY1+2*LG;                      // treble middle (B4)
+  var TY2=TY1+4*LG+staffGap;            // bass top line
+  var MY2=TY2+2*LG;                      // bass middle (D3)
+  var CW=Math.round(W*0.175);
+  var NX=CW+Math.round((W-CW)*0.45);
+  var SW='1.2'; var NRX=showClef?6.5:5; var NRY=showClef?4.5:3.2; var SL=26;
+  var showClef=true;
+  var cf='Apple Symbols,Segoe UI Symbol,FreeSerif,serif';
+  var out='';
+
+  // Staff lines — treble
+  for(var i=0;i<5;i++) out+='<line x1="'+(CW-3)+'" y1="'+(TY1+i*LG)+'" x2="'+(W-4)+'" y2="'+(TY1+i*LG)+'" stroke="#222" stroke-width="'+SW+'"/>';
+  // Staff lines — bass
+  for(var i=0;i<5;i++) out+='<line x1="'+(CW-3)+'" y1="'+(TY2+i*LG)+'" x2="'+(W-4)+'" y2="'+(TY2+i*LG)+'" stroke="#222" stroke-width="'+SW+'"/>';
+
+  // Vertical bar connecting both staves on left
+  out+='<line x1="'+(CW-3)+'" y1="'+TY1+'" x2="'+(CW-3)+'" y2="'+(TY2+4*LG)+'" stroke="#222" stroke-width="2"/>';
+
+  // Treble clef
+  var tf=Math.round(LG*4.8), tcy=TY1+4*LG+Math.round(LG*0.5);
+  out+='<text x="2" y="'+tcy+'" font-size="'+tf+'" fill="#222" font-family="'+cf+'">'+TREBLE_CHAR+'</text>';
+
+  // Bass clef
+  var bf=Math.round(LG*2.6), bx=Math.round(LG*0.5);
+  out+='<text x="'+bx+'" y="'+(MY2-HALF)+'" dominant-baseline="middle" font-size="'+bf+'" fill="#222" font-family="'+cf+'">'+BASS_CHAR+'</text>';
+
+  // Helper: render notes on a staff
+  function renderNotes(keys, stepMap, MY) {
+    if(!keys||!keys.length) return '';
+    var s='', npos=[], j, k, sv, np;
+    var lw=13, ldrDone={}, ls, ly;
+    for(j=0;j<keys.length;j++){k=keys[j];sv=(k in stepMap)?stepMap[k]:0;npos.push({x:NX,y:MY-sv*HALF,s:sv});}
+    if(npos.length===2&&Math.abs(npos[0].s-npos[1].s)===1){npos[0].x=NX-7;npos[1].x=NX+7;}
+    // Ledger lines
+    for(j=0;j<npos.length;j++){
+      sv=npos[j].s;
+      if(sv<=-6){for(ls=-6;ls>=sv;ls-=2){ly=MY-ls*HALF;if(!ldrDone[ly]){s+='<line x1="'+(NX-lw)+'" y1="'+ly+'" x2="'+(NX+lw)+'" y2="'+ly+'" stroke="#222" stroke-width="'+SW+'"/>';ldrDone[ly]=1;}}}
+      else if(sv>=6){for(ls=6;ls<=sv;ls+=2){ly=MY-ls*HALF;if(!ldrDone[ly]){s+='<line x1="'+(NX-lw)+'" y1="'+ly+'" x2="'+(NX+lw)+'" y2="'+ly+'" stroke="#222" stroke-width="'+SW+'"/>';ldrDone[ly]=1;}}}
+    }
+    // Stems
+    var avgS=0; for(j=0;j<npos.length;j++) avgS+=npos[j].s;
+    var stemUp=(avgS/npos.length)<0;
+    var minY=npos[0].y,maxY=npos[0].y,minX=npos[0].x,maxX=npos[0].x;
+    for(j=1;j<npos.length;j++){if(npos[j].y<minY)minY=npos[j].y;if(npos[j].y>maxY)maxY=npos[j].y;if(npos[j].x<minX)minX=npos[j].x;if(npos[j].x>maxX)maxX=npos[j].x;}
+    var sx;
+    if(stemUp){sx=minX+NRX;s+='<line x1="'+sx+'" y1="'+(maxY-2)+'" x2="'+sx+'" y2="'+(minY-SL)+'" stroke="#222" stroke-width="1.4"/>';}
+    else{sx=maxX-NRX;s+='<line x1="'+sx+'" y1="'+(minY+2)+'" x2="'+sx+'" y2="'+(maxY+SL)+'" stroke="#222" stroke-width="1.4"/>';}
+    // Note heads
+    for(j=0;j<npos.length;j++){np=npos[j];s+='<ellipse cx="'+np.x+'" cy="'+np.y+'" rx="'+NRX+'" ry="'+NRY+'" fill="#222" transform="rotate(-14 '+np.x+' '+np.y+')"/>';}
+    return s;
+  }
+
+  out+=renderNotes(q.tKeys,TREBLE_STEPS,MY1);
+  out+=renderNotes(q.bKeys,BASS_STEPS,MY2);
+
+  return '<svg width="'+W+'" height="'+H+'" xmlns="http://www.w3.org/2000/svg">'+out+'</svg>';
+}
+
 function drawStaff(q) {
   var el = document.getElementById('staff-render');
-  if (el) el.innerHTML = buildSVG(q, {W:310, H:148, lg:11, showClef:true});
+  if (!el) return;
+  if (q.clef === 'grand') {
+    el.innerHTML = buildGrandSVG(q, {W:310, H:190, lg:10});
+  } else {
+    el.innerHTML = buildSVG(q, {W:310, H:148, lg:11, showClef:true});
+  }
 }
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
@@ -507,6 +578,8 @@ var timerEnabled = false;
 var questionStartTime = 0;
 var timerRAF = null;
 var MAX_TIME = 15000, FULL_TIME = 5000, MIN_FACTOR = 0.2;
+function qFull(){ return (Q&&Q.timerFull)||FULL_TIME; }
+function qMax() { return (Q&&Q.timerMax) ||MAX_TIME;  }
 
 function loadTimerSetting() {
   try { timerEnabled = !!JSON.parse(localStorage.getItem('pianoread_timer')); } catch(e) {}
@@ -543,35 +616,35 @@ function freezeTimer() {
   if (!timerEnabled) return;
   var elapsed = Date.now() - questionStartTime;
   var secs = elapsed / 1000;
-  // Keep bar frozen at current position, just update label to show answer time
   var timeEl = document.getElementById('timer-time');
   timeEl.textContent = 'Answered in ' + secs.toFixed(1) + 's';
-  timeEl.style.color = elapsed <= FULL_TIME ? 'var(--grn)' : elapsed >= MAX_TIME ? 'var(--red)' : 'var(--yel)';
+  timeEl.style.color = elapsed <= qFull() ? 'var(--grn)' : elapsed >= qMax() ? 'var(--red)' : 'var(--yel)';
 }
 
 function tickTimer() {
   var elapsed = Date.now() - questionStartTime;
-  var pct = Math.max(0, 1 - elapsed / MAX_TIME);
+  var mx = qMax();
+  var pct = Math.max(0, 1 - elapsed / mx);
   var fill = document.getElementById('timer-fill');
   var timeEl = document.getElementById('timer-time');
   fill.style.width = (pct * 100) + '%';
-  // Green → yellow → red
   var r, g;
   if (pct > 0.5) { r = Math.round(255 * (1 - pct) * 2); g = 210; }
   else           { r = 248; g = Math.round(210 * pct * 2); }
   fill.style.background = 'rgb('+r+','+g+',70)';
-  var secs = Math.max(0, MAX_TIME - elapsed) / 1000;
+  var secs = Math.max(0, mx - elapsed) / 1000;
   timeEl.textContent = secs.toFixed(1) + 's';
   timeEl.style.color = pct < 0.33 ? 'var(--red)' : pct < 0.67 ? 'var(--yel)' : 'var(--dim)';
-  if (elapsed < MAX_TIME) timerRAF = requestAnimationFrame(tickTimer);
+  if (elapsed < mx) timerRAF = requestAnimationFrame(tickTimer);
 }
 
 function getTimeFactor() {
   if (!timerEnabled) return 1;
   var elapsed = Date.now() - questionStartTime;
-  if (elapsed <= FULL_TIME) return 1;
-  if (elapsed >= MAX_TIME) return MIN_FACTOR;
-  return 1 - (elapsed - FULL_TIME) / (MAX_TIME - FULL_TIME) * (1 - MIN_FACTOR);
+  var full = qFull(), mx = qMax();
+  if (elapsed <= full) return 1;
+  if (elapsed >= mx) return MIN_FACTOR;
+  return 1 - (elapsed - full) / (mx - full) * (1 - MIN_FACTOR);
 }
 
 // ─── Award points ─────────────────────────────────────────────────────────────
@@ -610,6 +683,28 @@ function awardPoints(type, basePts) {
   updateScoreUI();
 }
 
+// ─── Difficulty config ────────────────────────────────────────────────────────
+// s1=single note, s2=2-note same hand, s3=3-note same hand
+// m2=2-note mixed hands, m3=3-note mixed hands
+var DIFFICULTY = [
+  ['s1'],                             // 0 Beginner
+  ['s1','s1','s1','s2'],              // 1 Novice
+  ['s1','s1','s2','s2'],              // 2 Student
+  ['s1','s2','s2','s2','s3'],         // 3 Musician
+  ['s2','s2','s3','s3'],              // 4 Performer
+  ['s2','s3','s3','m2'],              // 5 Expert
+  ['s3','m2','m2','m3'],              // 6 Virtuoso
+  ['m2','m2','m3','m3']               // 7 Maestro
+];
+
+var TIMER_CFG = {
+  s1:{full:5000,  max:15000},
+  s2:{full:7000,  max:17000},
+  s3:{full:10000, max:20000},
+  m2:{full:8000,  max:18000},
+  m3:{full:12000, max:22000}
+};
+
 // ─── Question generation ──────────────────────────────────────────────────────
 var NOTE_ORDER='cdefgab';
 function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
@@ -621,18 +716,62 @@ function sortKeys(keys){
     return NOTE_ORDER.indexOf(a[0])-NOTE_ORDER.indexOf(b[0]);
   });
 }
+
+// Pick n notes from pool with all unique letter names
+function pickN(pool, n) {
+  var sh=pool.slice().sort(function(){return Math.random()-.5;}), out=[], seen={};
+  for(var i=0;i<sh.length&&out.length<n;i++){
+    if(!seen[sh[i][0]]){seen[sh[i][0]]=1;out.push(sh[i]);}
+  }
+  return sortKeys(out);
+}
+
+// Pick n mixed-hand notes (at least 1 from each hand), all unique letter names
+function pickMixed(n) {
+  var allPools = BASS_POOL.map(function(k){return {k:k,h:'bass'};})
+    .concat(TREBLE_POOL.map(function(k){return {k:k,h:'treble'};}));
+  for(var attempt=0;attempt<20;attempt++){
+    var sh=allPools.slice().sort(function(){return Math.random()-.5;});
+    var out=[],seen={};
+    for(var i=0;i<sh.length&&out.length<n;i++){
+      if(!seen[sh[i].k[0]]){seen[sh[i].k[0]]=1;out.push(sh[i]);}
+    }
+    if(out.length<n) continue;
+    var hasBass=out.some(function(x){return x.h==='bass';});
+    var hasTreble=out.some(function(x){return x.h==='treble';});
+    if(hasBass&&hasTreble) return out;
+  }
+  // fallback
+  return [{k:pick(BASS_POOL),h:'bass'},{k:pick(TREBLE_POOL),h:'treble'}];
+}
+
 function genQ(){
-  var clef=(Math.random()<0.7)?'bass':'treble';
-  var pool=(clef==='bass')?BASS_POOL:TREBLE_POOL;
-  var isChord=(Math.random()<0.4);
-  var keys,a,b,t;
-  if(isChord){
-    var sh=pool.slice().sort(function(){return Math.random()-0.5;});
-    a=sh[0]; b=sh[1]; t=0;
-    while(a[0]===b[0]&&t++<10) b=pick(pool);
-    keys=sortKeys([a,b]);
-  } else { keys=[pick(pool)]; }
-  return {clef:clef, keys:keys, letters:keys.map(letterOf), isChord:isChord};
+  var lvlIdx=getLevelIdx(loadGame().xp);
+  var diff=DIFFICULTY[Math.min(lvlIdx,DIFFICULTY.length-1)];
+  var type=diff[Math.floor(Math.random()*diff.length)];
+  var tc=TIMER_CFG[type];
+  var clef,pool,keys,items,bKeys,tKeys,allKeys;
+
+  if(type==='s1'){
+    clef=Math.random()<0.7?'bass':'treble';
+    pool=clef==='bass'?BASS_POOL:TREBLE_POOL;
+    keys=[pick(pool)];
+    return {type:type,clef:clef,keys:keys,bKeys:clef==='bass'?keys:[],tKeys:clef==='treble'?keys:[],letters:keys.map(letterOf),timerFull:tc.full,timerMax:tc.max};
+  }
+  if(type==='s2'||type==='s3'){
+    var n=type==='s2'?2:3;
+    clef=Math.random()<0.7?'bass':'treble';
+    pool=clef==='bass'?BASS_POOL:TREBLE_POOL;
+    keys=pickN(pool,n);
+    return {type:type,clef:clef,keys:keys,bKeys:clef==='bass'?keys:[],tKeys:clef==='treble'?keys:[],letters:keys.map(letterOf),timerFull:tc.full,timerMax:tc.max};
+  }
+  // mixed: m2 or m3
+  var mn=type==='m2'?2:3;
+  items=pickMixed(mn);
+  bKeys=sortKeys(items.filter(function(x){return x.h==='bass';}).map(function(x){return x.k;}));
+  tKeys=sortKeys(items.filter(function(x){return x.h==='treble';}).map(function(x){return x.k;}));
+  allKeys=sortKeys(bKeys.concat(tKeys));
+  return {type:type,clef:'grand',keys:allKeys,bKeys:bKeys,tKeys:tKeys,letters:allKeys.map(letterOf),timerFull:tc.full,timerMax:tc.max};
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -641,12 +780,23 @@ var Q=null, awaitingNext=false;
 // ─── Input fields ─────────────────────────────────────────────────────────────
 function buildFields(q) {
   var c=document.getElementById('fields'); c.innerHTML='';
-  var n=q.isChord?2:1;
+  var n=q.letters.length;
+  // Labels for mixed-hand questions
+  var mixedLabels = [];
+  if(q.clef==='grand') {
+    var bi=0, ti=0;
+    for(var ki=0;ki<q.keys.length;ki++){
+      var k=q.keys[ki];
+      if(q.bKeys.indexOf(k)!==-1){ mixedLabels.push('LH '+(++bi)); }
+      else { mixedLabels.push('RH '+(++ti)); }
+    }
+  }
   for (var i=0; i<n; i++) {
     !function(idx,total){
       var wrap=document.createElement('div'); wrap.className='fw';
       var lbl=document.createElement('div'); lbl.className='fl';
-      lbl.textContent=(total===1)?'Note':('Note '+(idx+1));
+      if(q.clef==='grand') lbl.textContent=mixedLabels[idx];
+      else lbl.textContent=(total===1)?'Note':('Note '+(idx+1));
       var inp=document.createElement('input');
       inp.type='text'; inp.className='ni'; inp.id='ni'+idx; inp.maxLength=1;
       inp.setAttribute('autocomplete','off'); inp.setAttribute('autocorrect','off');
@@ -686,55 +836,37 @@ function submit() {
   }
   for(i=0;i<vals.length;i++){if(!vals[i]){inputs[i].focus();return;}}
 
-  if (Q.isChord) {
-    // Score each note individually: +10 per correct, -5 per wrong
-    var correctSet = Q.letters.slice();
-    var numRight = 0, numWrong = 0;
-    for(i=0;i<vals.length;i++){
-      if(correctSet.indexOf(vals[i])!==-1){ numRight++; inputs[i].classList.add('ok'); }
-      else { numWrong++; inputs[i].classList.add('bad'); }
-    }
-    var basePts = numRight * 10 - numWrong * 5;
-    record(Q, vals.join(','), numRight===vals.length ? 'correct' : 'wrong');
+  // Score all note types uniformly: +10 per correct, -5 per wrong
+  var correctSet=Q.letters.slice(), numRight=0, numWrong=0;
+  for(i=0;i<vals.length;i++){
+    if(correctSet.indexOf(vals[i])!==-1){numRight++;inputs[i].classList.add('ok');}
+    else{numWrong++;inputs[i].classList.add('bad');}
+  }
+  var basePts=numRight*10-numWrong*5;
+  var n=Q.letters.length;
+  record(Q,vals.join(','),numRight===n?'correct':'wrong');
 
-    if(numRight===vals.length){
-      showFb('ok','✓ Perfect! Both notes correct!');
-      awardPoints('correct', basePts); // basePts = +20
-      flashCard('flash-ok');
-      launchConfetti();
-    } else if(numRight > 0){
-      showFb('skip','~ Partial — answer: '+Q.letters.join(', '));
-      awardPoints('partial', basePts); // basePts = +5
-      flashCard('flash-bad');
-      for(i=0;i<inputs.length;i++){
-        if(inputs[i].classList.contains('bad')){
-          (function(el){el.classList.add('shake');setTimeout(function(){el.classList.remove('shake');},400);})(inputs[i]);
-        }
-      }
-    } else {
-      showFb('bad','✗ Wrong — answer: '+Q.letters.join(', '));
-      awardPoints('wrong', basePts); // basePts = -10
-      flashCard('flash-bad');
-      for(i=0;i<inputs.length;i++){
+  if(numRight===n){
+    var msg=n===1?'✓ Correct!':(n===2?'✓ Perfect! Both notes!':'✓ All '+n+' notes correct!');
+    showFb('ok',msg);
+    awardPoints('correct',basePts);
+    flashCard('flash-ok');
+    launchConfetti();
+  } else if(numRight>0){
+    showFb('skip','~ Partial ('+numRight+'/'+n+') — answer: '+Q.letters.join(', '));
+    awardPoints('partial',basePts);
+    flashCard('flash-bad');
+    for(i=0;i<inputs.length;i++){
+      if(inputs[i].classList.contains('bad')){
         (function(el){el.classList.add('shake');setTimeout(function(){el.classList.remove('shake');},400);})(inputs[i]);
       }
     }
   } else {
-    // Single note
-    var correct = vals[0]===Q.letters[0];
-    inputs[0].classList.add(correct?'ok':'bad');
-    if(correct){
-      showFb('ok','✓ Correct!');
-      record(Q,vals[0],'correct');
-      awardPoints('correct', 10);
-      flashCard('flash-ok');
-      launchConfetti();
-    } else {
-      showFb('bad','✗ Wrong — answer: '+Q.letters[0]);
-      record(Q,vals[0],'wrong');
-      awardPoints('wrong', -5);
-      flashCard('flash-bad');
-      (function(el){el.classList.add('shake');setTimeout(function(){el.classList.remove('shake');},400);})(inputs[0]);
+    showFb('bad','✗ Wrong — answer: '+Q.letters.join(', '));
+    awardPoints('wrong',basePts);
+    flashCard('flash-bad');
+    for(i=0;i<inputs.length;i++){
+      (function(el){el.classList.add('shake');setTimeout(function(){el.classList.remove('shake');},400);})(inputs[i]);
     }
   }
   goAwaitNext();
@@ -767,8 +899,9 @@ function nextQ(){
   Q=genQ(); drawStaff(Q); buildFields(Q); startTimer();
   var qEl=document.getElementById('quiz'); qEl.scrollTop=0;
   var tag=document.getElementById('ctag');
-  tag.textContent=(Q.clef==='bass')?'Bass clef — left hand':'Treble clef — right hand';
-  tag.className='clef-tag '+Q.clef;
+  if(Q.clef==='grand'){tag.textContent='Both hands';tag.className='clef-tag bass';}
+  else if(Q.clef==='bass'){tag.textContent='Bass clef — left hand';tag.className='clef-tag bass';}
+  else{tag.textContent='Treble clef — right hand';tag.className='clef-tag treble';}
 }
 
 // ─── History ──────────────────────────────────────────────────────────────────
