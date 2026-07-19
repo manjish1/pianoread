@@ -753,6 +753,56 @@ function sortKeys(keys){
 }
 
 // Pick n notes from pool with all unique letter names
+// ─── Chord tables (natural notes only) ───────────────────────────────────────
+var TREBLE_CHORDS = [
+  // Root position
+  ['c/4','e/4','g/4'],['d/4','f/4','a/4'],['e/4','g/4','b/4'],
+  ['f/4','a/4','c/5'],['g/4','b/4','d/5'],['a/4','c/5','e/5'],['b/4','d/5','f/5'],
+  // 1st inversion
+  ['e/4','g/4','c/5'],['f/4','a/4','d/5'],['g/4','b/4','e/5'],
+  ['a/4','c/5','f/5'],['b/4','d/5','g/5'],
+  // 2nd inversion
+  ['g/4','c/5','e/5'],['a/4','d/5','f/5'],['b/4','e/5','g/5']
+];
+
+var BASS_CHORDS = [
+  // Root position (low register)
+  ['f/2','a/2','c/3'],['g/2','b/2','d/3'],['a/2','c/3','e/3'],
+  ['b/2','d/3','f/3'],['c/3','e/3','g/3'],['d/3','f/3','a/3'],
+  ['e/3','g/3','b/3'],['f/3','a/3','c/4'],
+  // 1st inversion
+  ['a/2','c/3','f/3'],['b/2','d/3','g/3'],['c/3','e/3','a/3'],
+  ['d/3','f/3','b/3'],['e/3','g/3','c/4'],
+  // 2nd inversion
+  ['c/3','f/3','a/3'],['d/3','g/3','b/3'],['e/3','a/3','c/4']
+];
+
+// Mixed-hand 3-note chords: at least 1 note in bass, at least 1 in treble
+var MIXED_CHORDS_3 = [
+  // C major voicings
+  {bKeys:['c/3'],tKeys:['e/4','g/4']},{bKeys:['e/3'],tKeys:['g/4','c/5']},
+  {bKeys:['g/3'],tKeys:['c/5','e/5']},{bKeys:['c/3','e/3'],tKeys:['g/4']},
+  {bKeys:['e/3','g/3'],tKeys:['c/5']},
+  // D minor voicings
+  {bKeys:['d/3'],tKeys:['f/4','a/4']},{bKeys:['f/3'],tKeys:['a/4','d/5']},
+  {bKeys:['d/3','f/3'],tKeys:['a/4']},{bKeys:['a/3'],tKeys:['d/5','f/5']},
+  // E minor voicings
+  {bKeys:['e/3'],tKeys:['g/4','b/4']},{bKeys:['g/3'],tKeys:['b/4','e/5']},
+  {bKeys:['e/3','g/3'],tKeys:['b/4']},{bKeys:['b/3'],tKeys:['e/5','g/5']},
+  // F major voicings
+  {bKeys:['f/3'],tKeys:['a/4','c/5']},{bKeys:['a/3'],tKeys:['c/5','f/5']},
+  {bKeys:['f/3','a/3'],tKeys:['c/5']},{bKeys:['c/4'],tKeys:['f/4','a/4']},
+  // G major voicings
+  {bKeys:['g/3'],tKeys:['b/4','d/5']},{bKeys:['b/3'],tKeys:['d/5','g/5']},
+  {bKeys:['g/3','b/3'],tKeys:['d/5']},{bKeys:['d/3'],tKeys:['g/4','b/4']},
+  // A minor voicings
+  {bKeys:['a/3'],tKeys:['c/5','e/5']},{bKeys:['c/4'],tKeys:['e/4','a/4']},
+  {bKeys:['a/3','c/4'],tKeys:['e/5']},{bKeys:['e/3'],tKeys:['a/4','c/5']},
+  // B diminished voicings
+  {bKeys:['b/2'],tKeys:['d/5','f/5']},{bKeys:['b/3'],tKeys:['d/5','f/5']},
+  {bKeys:['d/3'],tKeys:['f/4','b/4']},{bKeys:['d/3','f/3'],tKeys:['b/4']}
+];
+
 function pickN(pool, n) {
   var sh=pool.slice().sort(function(){return Math.random()-.5;}), out=[], seen={};
   for(var i=0;i<sh.length&&out.length<n;i++){
@@ -793,16 +843,25 @@ function genQ(){
     keys=[pick(pool)];
     return {type:type,clef:clef,keys:keys,bKeys:clef==='bass'?keys:[],tKeys:clef==='treble'?keys:[],letters:keys.map(letterOf),timerFull:tc.full,timerMax:tc.max};
   }
-  if(type==='s2'||type==='s3'){
-    var n=type==='s2'?2:3;
+  if(type==='s2'){
     clef=Math.random()<0.7?'bass':'treble';
     pool=clef==='bass'?BASS_POOL:TREBLE_POOL;
-    keys=pickN(pool,n);
+    keys=pickN(pool,2);
+    return {type:type,clef:clef,keys:keys,bKeys:clef==='bass'?keys:[],tKeys:clef==='treble'?keys:[],letters:keys.map(letterOf),timerFull:tc.full,timerMax:tc.max};
+  }
+  if(type==='s3'){
+    clef=Math.random()<0.7?'bass':'treble';
+    keys=pick(clef==='bass'?BASS_CHORDS:TREBLE_CHORDS).slice();
     return {type:type,clef:clef,keys:keys,bKeys:clef==='bass'?keys:[],tKeys:clef==='treble'?keys:[],letters:keys.map(letterOf),timerFull:tc.full,timerMax:tc.max};
   }
   // mixed: m2 or m3
-  var mn=type==='m2'?2:3;
-  items=pickMixed(mn);
+  if(type==='m3'){
+    var mc=pick(MIXED_CHORDS_3);
+    bKeys=mc.bKeys.slice(); tKeys=mc.tKeys.slice();
+    allKeys=sortKeys(bKeys.concat(tKeys));
+    return {type:type,clef:'grand',keys:allKeys,bKeys:bKeys,tKeys:tKeys,letters:allKeys.map(letterOf),timerFull:tc.full,timerMax:tc.max};
+  }
+  items=pickMixed(2);
   bKeys=sortKeys(items.filter(function(x){return x.h==='bass';}).map(function(x){return x.k;}));
   tKeys=sortKeys(items.filter(function(x){return x.h==='treble';}).map(function(x){return x.k;}));
   allKeys=sortKeys(bKeys.concat(tKeys));
