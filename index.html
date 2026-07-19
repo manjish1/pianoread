@@ -134,6 +134,15 @@ nav button.on{background:var(--s2);border-color:var(--b);color:var(--txt)}
 
 <canvas id="confetti-canvas"></canvas>
 <div id="pt-popup"></div>
+<div id="completion-overlay" style="position:fixed;inset:0;z-index:960;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(13,13,18,.92);backdrop-filter:blur(8px)" onclick="this.style.display='none'">
+  <div style="background:linear-gradient(135deg,#1a1a35,#0d0d20);border:2px solid #fbbf24;border-radius:28px;padding:40px 48px;text-align:center;animation:zoomIn .6s cubic-bezier(.175,.885,.32,1.275) forwards;max-width:320px">
+    <div style="font-size:64px;line-height:1;margin-bottom:10px">🎓</div>
+    <div style="font-size:13px;font-weight:700;color:#fbbf24;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px">50 Correct Answers!</div>
+    <div style="font-size:30px;font-weight:800;color:#fbbf24;margin-bottom:6px">You did it!</div>
+    <div style="font-size:14px;color:var(--dim);margin-bottom:20px;line-height:1.5">You've completed all levels and proven your mastery of piano note reading.</div>
+    <div style="font-size:11px;color:var(--dim);opacity:.6">Tap anywhere to continue</div>
+  </div>
+</div>
 <div id="levelup-overlay">
   <div class="lu-box">
     <div class="lu-emoji" id="lu-emoji">🎉</div>
@@ -214,16 +223,18 @@ var TREBLE_STEPS = {'c/4':-6,'d/4':-5,'e/4':-4,'f/4':-3,'g/4':-2,'a/4':-1,'b/4':
 var BASS_STEPS   = {'f/2':-5,'g/2':-4,'a/2':-3,'b/2':-2,'c/3':-1,'d/3':0,'e/3':1,'f/3':2,'g/3':3,'a/3':4,'b/3':5,'c/4':6};
 
 // ─── Levels ───────────────────────────────────────────────────────────────────
+// XP thresholds calibrated so ~50 correct answers at avg speed (4.5 XP) = Maestro (225 XP)
 var LEVELS = [
-  {name:'Beginner',  emoji:'🎹', xp:0,    sub:'Just getting started!'},
-  {name:'Novice',    emoji:'🎵', xp:100,  sub:'Notes are clicking!'},
-  {name:'Student',   emoji:'🎶', xp:250,  sub:'Practice makes perfect.'},
-  {name:'Musician',  emoji:'🎸', xp:500,  sub:'Sounding good!'},
-  {name:'Performer', emoji:'🎤', xp:900,  sub:'Ready for the stage!'},
-  {name:'Expert',    emoji:'🏅', xp:1500, sub:'Seriously impressive.'},
-  {name:'Virtuoso',  emoji:'🌟', xp:2500, sub:'Near the top!'},
-  {name:'Maestro',   emoji:'👑', xp:4000, sub:'Pure mastery.'}
+  {name:'Beginner',  emoji:'🎹', xp:0,   sub:'Just getting started!'},
+  {name:'Novice',    emoji:'🎵', xp:28,  sub:'Notes are clicking!'},
+  {name:'Student',   emoji:'🎶', xp:56,  sub:'Practice makes perfect.'},
+  {name:'Musician',  emoji:'🎸', xp:90,  sub:'Sounding good!'},
+  {name:'Performer', emoji:'🎤', xp:124, sub:'Ready for the stage!'},
+  {name:'Expert',    emoji:'🏅', xp:158, sub:'Seriously impressive.'},
+  {name:'Virtuoso',  emoji:'🌟', xp:193, sub:'Near the top!'},
+  {name:'Maestro',   emoji:'👑', xp:225, sub:'Pure mastery.'}
 ];
+var TOTAL_CORRECT_GOAL = 50;
 
 function getLevelIdx(xp) {
   var idx = 0;
@@ -380,6 +391,12 @@ function showPtPopup(pts, mult) {
 }
 
 // ─── Level up overlay ─────────────────────────────────────────────────────────
+function showCompletion() {
+  launchConfetti();
+  var el = document.getElementById('completion-overlay');
+  el.style.display = 'flex';
+}
+
 function showLevelUp(lvl) {
   var el = document.getElementById('levelup-overlay');
   document.getElementById('lu-emoji').textContent = lvl.emoji;
@@ -650,6 +667,13 @@ function getTimeFactor() {
 // ─── Award points ─────────────────────────────────────────────────────────────
 // type: 'correct' | 'partial' | 'wrong' | 'skipped'
 // basePts: raw points before multiplier (e.g. +20 full chord, +5 partial, -10 all wrong)
+// XP per correct answer: 3 (slow) to 6 (fast), based purely on time factor
+function calcXP() {
+  var tf = getTimeFactor(); // 0.2 to 1.0
+  var normalized = (tf - MIN_FACTOR) / (1 - MIN_FACTOR); // 0.0 to 1.0
+  return Math.max(3, Math.min(6, Math.round(3 + 3 * normalized)));
+}
+
 function awardPoints(type, basePts) {
   var pts = basePts;
   var m = 1;
@@ -657,20 +681,24 @@ function awardPoints(type, basePts) {
     m = getMult();
     pts = Math.round(basePts * m * getTimeFactor());
     streak++;
+    var xp = calcXP();
     var g = loadGame();
+    if (!g.totalCorrect) g.totalCorrect = 0;
     var oldIdx = getLevelIdx(g.xp);
-    g.xp += pts;
+    g.xp += xp;
+    g.totalCorrect++;
     saveGame(g);
     var newIdx = getLevelIdx(g.xp);
     if (newIdx > oldIdx) setTimeout(function(){ showLevelUp(LEVELS[newIdx]); }, 600);
+    if (g.totalCorrect === TOTAL_CORRECT_GOAL) setTimeout(showCompletion, 900);
     updateLevelUI();
   } else if (type === 'partial') {
     pts = Math.round(basePts * getTimeFactor());
     streak = 0;
-    var xpGain = Math.max(0, pts);
-    if (xpGain > 0) {
+    var xpPartial = Math.max(0, Math.round(calcXP() * 0.5));
+    if (xpPartial > 0) {
       var g2 = loadGame();
-      g2.xp += xpGain;
+      g2.xp += xpPartial;
       saveGame(g2);
       updateLevelUI();
     }
