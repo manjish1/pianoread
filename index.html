@@ -268,12 +268,10 @@ function saveGame(g) { try { localStorage.setItem(GAME_KEY, JSON.stringify(g)); 
 var streak = 0;
 var sessionScore = 0;
 
-// Multiplier based on streak
+// Multiplier based on streak: every 5 correct adds 0.5x (5→1.5x, 10→2x, 15→2.5x …)
 function getMult() {
-  if (streak >= 7) return 3;
-  if (streak >= 4) return 2;
-  if (streak >= 2) return 1.5;
-  return 1;
+  var tiers = Math.floor(streak / 5);
+  return tiers > 0 ? 1 + tiers * 0.5 : 1;
 }
 
 // ─── Gamification UI ──────────────────────────────────────────────────────────
@@ -294,7 +292,7 @@ function updateScoreUI() {
 
   var pill = document.getElementById('streak-pill');
   var mult = document.getElementById('mult-badge');
-  if (streak >= 2) {
+  if (streak >= 5) {
     pill.className = 'streak-pill show';
     document.getElementById('streak-val').textContent = streak;
     var m = getMult();
